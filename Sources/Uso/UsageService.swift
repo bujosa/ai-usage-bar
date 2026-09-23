@@ -227,7 +227,7 @@ struct UsageService: Sendable {
             if let remaining {
                 detail = Format.money(cents: remaining)
             } else {
-                detail = "\(Format.money(cents: spent)) de \(Format.money(cents: limit))"
+                detail = "\(Format.money(cents: spent)) of \(Format.money(cents: limit))"
             }
             bars.append(MeterBar(id: "included", label: "Included", usedPercent: used, detail: detail))
         }

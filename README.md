@@ -8,7 +8,7 @@ Requires macOS 14 or later on Apple silicon.
 
 ## Install
 
-Download [Uso-1.0.0-macOS.zip](https://github.com/bujosa/ai-usage-bar/releases/latest) from the latest release.
+Download the latest zip from the [releases page](https://github.com/bujosa/ai-usage-bar/releases/latest).
 
 1. Unzip the file. You get `Uso.app`.
 2. Move `Uso.app` into Applications.
@@ -25,14 +25,14 @@ Claude Code stores its session in the login keychain. The first time you want th
 ./scripts/install.sh
 ```
 
-That builds a release binary, installs `~/Applications/Uso.app`, and opens it. `./scripts/package.sh` only writes `dist/Uso-1.0.0-macOS.zip`.
+That builds a release binary, installs `~/Applications/Uso.app`, and opens it. `./scripts/package.sh` only writes `dist/Uso-1.0.1-macOS.zip`.
 
 ## What each row shows
 
 - **Grok.** Weekly credits, plus Build, Imagine, Chat, and Voice when the account returns them.
 - **Cursor.** Included dollars and Auto on the row. API usage and the token mix are inside the row. Auto is the pool for the other models.
-- **Codex.** The OpenAI Codex window. On Pro this is the weekly limit.
-- **Claude.** Session, week, and a model week such as Fable when the account has one. The mix across Claude Code, Cowork, and the rest is inside the row.
+- **Codex.** The weekly window is on the row. A shorter window, when the account has one, sits above it.
+- **Claude.** Session and week are both on the row. A model week such as Fable, and the mix across Claude Code and the rest, are inside the row.
 - **OpenCode.** Local tokens for today, the last 7 days, and all time. This is sessions on this Mac, not a plan quota. An OpenCode Go key adds the official quota.
 
 Bars fill as usage goes up. Red means 90% or more used. Orange means 75% or more. The number on the row is what is left.

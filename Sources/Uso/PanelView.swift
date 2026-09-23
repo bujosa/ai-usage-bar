@@ -227,11 +227,11 @@ private struct ProviderRow: View {
             VStack(alignment: .leading, spacing: 6) {
                 ForEach(listBars) { bar in
                     VStack(alignment: .leading, spacing: 3) {
-                        if listBars.count > 1 {
+                        if showsBarLabels {
                             HStack {
                                 Text(bar.label)
-                                Spacer()
-                                Text("\(Format.percent(max(0, 100 - bar.usedPercent))) left")
+                                Spacer(minLength: 8)
+                                Text(barRemainder(bar))
                                     .monospacedDigit()
                             }
                             .font(.caption2)
@@ -263,11 +263,34 @@ private struct ProviderRow: View {
         return provider.headline
     }
 
+    private var showsBarLabels: Bool {
+        provider.id == "cursor" || provider.id == "claude" || provider.id == "openai"
+    }
+
     private var listBars: [MeterBar] {
-        if provider.id == "cursor" {
+        switch provider.id {
+        case "cursor":
             return provider.bars.filter { $0.id == "included" || $0.id == "auto" }
+        case "claude":
+            let order = ["session", "five", "weekly_all", "week"]
+            return provider.bars
+                .filter { order.contains($0.id) }
+                .sorted { (order.firstIndex(of: $0.id) ?? 9) < (order.firstIndex(of: $1.id) ?? 9) }
+        case "openai":
+            return provider.bars.sorted { lhs, rhs in
+                (lhs.label == "Week" ? 1 : 0) < (rhs.label == "Week" ? 1 : 0)
+            }
+        default:
+            return Array(provider.bars.prefix(1))
         }
-        return Array(provider.bars.prefix(1))
+    }
+
+    private func barRemainder(_ bar: MeterBar) -> String {
+        let left = "\(Format.percent(max(0, 100 - bar.usedPercent))) left"
+        if bar.detail.hasPrefix("in ") || bar.detail == "just reset" {
+            return "\(left) · \(bar.detail)"
+        }
+        return left
     }
 
     private var amountColor: Color {
@@ -288,9 +311,10 @@ private struct ProviderRow: View {
         if !plan.isEmpty, plan != "Local" {
             bits.append(plan)
         }
-        if provider.id != "cursor", let hot = provider.bars.dropFirst().first(where: { $0.usedPercent >= 99 }) {
+        let labeled = provider.id == "cursor" || provider.id == "claude" || provider.id == "openai"
+        if !labeled, let hot = provider.bars.dropFirst().first(where: { $0.usedPercent >= 99 }) {
             bits.append("\(hot.label) maxed")
-        } else if provider.id != "cursor", let detail = provider.bars.first?.detail, !detail.isEmpty {
+        } else if !labeled, let detail = provider.bars.first?.detail, !detail.isEmpty {
             bits.append(detail)
         } else if provider.bars.isEmpty, let week = provider.chips.first(where: { $0.id == "week" }) {
             bits.append("\(week.hint) in 7 days")
