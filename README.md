@@ -15,7 +15,7 @@ Download the latest zip from the [releases page](https://github.com/bujosa/ai-us
 1. Unzip the file. You get `Uso.app`.
 2. Move `Uso.app` into Applications.
 3. Open it. If macOS says the app cannot be checked, right-click `Uso.app`, choose Open, then Open again.
-4. Look in the menu bar for the tightest account.
+4. Look in the menu bar. The label cycles through each account.
 
 The app does not show a Dock icon. Quit it from the panel.
 
@@ -27,7 +27,7 @@ Claude Code stores its session in the login keychain. The first time you want th
 ./scripts/install.sh
 ```
 
-That builds a release binary, installs `~/Applications/Uso.app`, and opens it. `./scripts/package.sh` only writes `dist/Uso-1.0.4-macOS.zip`.
+That builds a release binary, installs `~/Applications/Uso.app`, and opens it. `./scripts/package.sh` only writes `dist/Uso-1.0.5-macOS.zip`.
 
 ## What each row shows
 

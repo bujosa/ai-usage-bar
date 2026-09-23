@@ -2,7 +2,7 @@
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$root"
-version="1.0.4"
+version="1.0.5"
 swift build -c release
 
 stage="$(mktemp -d)"
@@ -18,7 +18,7 @@ cat > "$app/Contents/Info.plist" << EOF
   <key>CFBundleExecutable</key>
   <string>Uso</string>
   <key>CFBundleIdentifier</key>
-  <string>com.davidbujosa.uso</string>
+  <string>com.davidbujosa.uso.bar</string>
   <key>CFBundleName</key>
   <string>Uso</string>
   <key>CFBundleDisplayName</key>

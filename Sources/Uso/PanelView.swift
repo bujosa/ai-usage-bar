@@ -156,6 +156,7 @@ struct PanelView: View {
                 }
                 Spacer()
                 Button("Quit") {
+                    AppExit.requested = true
                     NSApp.terminate(nil)
                 }
                 .buttonStyle(.plain)
