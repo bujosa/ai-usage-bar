@@ -4,6 +4,8 @@ Menu bar app for macOS. It shows what is left on Grok, Cursor, Codex, Claude, an
 
 The menu bar item names the tightest allowance, for example `Grok 2%`. Click it to open the panel. Click anywhere else, or press Escape, to hide it. Open a row for the full breakdown.
 
+![Usage menu bar panel](docs/panel.png)
+
 Requires macOS 14 or later on Apple silicon.
 
 ## Install
