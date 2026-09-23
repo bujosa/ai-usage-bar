@@ -27,7 +27,7 @@ Claude Code stores its session in the login keychain. The first time you want th
 ./scripts/install.sh
 ```
 
-That builds a release binary, installs `~/Applications/Uso.app`, and opens it. `./scripts/package.sh` only writes `dist/Uso-1.0.2-macOS.zip`.
+That builds a release binary, installs `~/Applications/Uso.app`, and opens it. `./scripts/package.sh` only writes `dist/Uso-1.0.3-macOS.zip`.
 
 ## What each row shows
 

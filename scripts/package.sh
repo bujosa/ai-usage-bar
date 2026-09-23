@@ -2,13 +2,14 @@
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$root"
-version="1.0.2"
+version="1.0.3"
 swift build -c release
 
 stage="$(mktemp -d)"
 app="$stage/Uso.app"
-mkdir -p "$app/Contents/MacOS"
+mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 cp "$root/.build/release/Uso" "$app/Contents/MacOS/Uso"
+cp "$root/AppIcon/AppIcon.icns" "$app/Contents/Resources/AppIcon.icns"
 cat > "$app/Contents/Info.plist" << EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -22,6 +23,8 @@ cat > "$app/Contents/Info.plist" << EOF
   <string>Uso</string>
   <key>CFBundleDisplayName</key>
   <string>Uso</string>
+  <key>CFBundleIconFile</key>
+  <string>AppIcon</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>

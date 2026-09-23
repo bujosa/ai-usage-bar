@@ -44,9 +44,25 @@ private struct MenuTitle: View {
     @ObservedObject private var store = SharedStore.store
 
     var body: some View {
-        Text(store.menuTitle)
-            .font(.system(size: 12, weight: .medium))
-            .onAppear { store.activate() }
+        HStack(spacing: 5) {
+            MenuMark()
+            Text(store.menuTitle)
+                .font(.system(size: 12, weight: .medium))
+        }
+        .onAppear { store.activate() }
+    }
+}
+
+private struct MenuMark: View {
+    var body: some View {
+        Canvas { context, size in
+            let bar = CGRect(x: 0, y: (size.height - 3) / 2, width: size.width, height: 3)
+            let used = CGRect(x: 0, y: bar.minY, width: size.width * 0.68, height: bar.height)
+            context.fill(Path(roundedRect: bar, cornerRadius: 1.5), with: .color(.primary.opacity(0.32)))
+            context.fill(Path(roundedRect: used, cornerRadius: 1.5), with: .color(.primary))
+        }
+        .frame(width: 15, height: 8)
+        .accessibilityHidden(true)
     }
 }
 
