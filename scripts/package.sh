@@ -2,7 +2,7 @@
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$root"
-version="1.0.3"
+version="1.0.4"
 swift build -c release
 
 stage="$(mktemp -d)"

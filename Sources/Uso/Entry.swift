@@ -48,6 +48,9 @@ private struct MenuTitle: View {
             MenuMark()
             Text(store.menuTitle)
                 .font(.system(size: 12, weight: .medium))
+                .monospacedDigit()
+                .lineLimit(1)
+                .contentTransition(.opacity)
         }
         .onAppear { store.activate() }
     }

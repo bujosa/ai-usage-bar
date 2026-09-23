@@ -13,6 +13,9 @@ final class UsageStore: ObservableObject {
     @Published var loginMessage: String?
 
     private var timer: Timer?
+    private var ticker: Timer?
+    private var tickerLines: [String] = []
+    private var tickerIndex = 0
     private var task: Task<Void, Never>?
     private let service = UsageService()
 
@@ -41,6 +44,27 @@ final class UsageStore: ObservableObject {
                 self?.refresh()
             }
         }
+        ticker = Timer.scheduledTimer(withTimeInterval: 3.5, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                self?.advanceTicker()
+            }
+        }
+    }
+
+    private func advanceTicker() {
+        guard tickerLines.count > 1 else { return }
+        tickerIndex = (tickerIndex + 1) % tickerLines.count
+        menuTitle = tickerLines[tickerIndex]
+    }
+
+    private func syncTicker() {
+        tickerLines = MenuTicker.lines(from: providers.filter { $0.tone == .ready })
+        guard !tickerLines.isEmpty else {
+            menuTitle = "Usage"
+            return
+        }
+        tickerIndex = tickerIndex % tickerLines.count
+        menuTitle = tickerLines[tickerIndex]
     }
 
     func refresh(force: Bool = false) {
@@ -78,7 +102,7 @@ final class UsageStore: ObservableObject {
         providers = next
         let ready = providers.filter { $0.tone == .ready }
         hero = Pressure.hero(from: ready)
-        menuTitle = Pressure.menuTitle(from: ready)
+        syncTicker()
         updatedAt = Date()
     }
 

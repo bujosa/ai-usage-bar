@@ -2,7 +2,7 @@
 
 Menu bar app for macOS. It shows what is left on Grok, Cursor, Codex, Claude, and OpenCode.
 
-The menu bar item names the tightest allowance, for example `Grok 2%`. Click it to open the panel. Click anywhere else, or press Escape, to hide it. Open a row for the full breakdown.
+The menu bar cycles through the accounts, about 3 seconds each. Claude shows the 5-hour window, then the week. Cursor shows included dollars, then Auto. Click the item to open the panel. Click anywhere else, or press Escape, to hide it. Open a row for the full breakdown.
 
 ![Usage menu bar panel](docs/panel.png)
 
@@ -27,7 +27,7 @@ Claude Code stores its session in the login keychain. The first time you want th
 ./scripts/install.sh
 ```
 
-That builds a release binary, installs `~/Applications/Uso.app`, and opens it. `./scripts/package.sh` only writes `dist/Uso-1.0.3-macOS.zip`.
+That builds a release binary, installs `~/Applications/Uso.app`, and opens it. `./scripts/package.sh` only writes `dist/Uso-1.0.4-macOS.zip`.
 
 ## What each row shows
 

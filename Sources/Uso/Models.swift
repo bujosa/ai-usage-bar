@@ -130,11 +130,64 @@ enum Pressure {
     }
 
     static func menuTitle(from providers: [ProviderSnapshot]) -> String {
-        guard let hero = hero(from: providers) else { return "Usage" }
-        if hero.usedPercent >= 99.5 {
-            return "\(hero.name) 0%"
+        MenuTicker.lines(from: providers).first ?? "Usage"
+    }
+}
+
+enum MenuTicker {
+    static func lines(from providers: [ProviderSnapshot]) -> [String] {
+        providers.filter { $0.tone == .ready }.flatMap(lines(for:))
+    }
+
+    private static func lines(for provider: ProviderSnapshot) -> [String] {
+        switch provider.id {
+        case "grok":
+            guard let bar = provider.bars.first else { return [] }
+            return ["Grok \(remaining(bar))"]
+        case "cursor":
+            var lines: [String] = []
+            if provider.headline.contains("$") {
+                lines.append("Cursor \(provider.headline.replacingOccurrences(of: " left", with: ""))")
+            } else if let included = provider.bars.first(where: { $0.id == "included" }) {
+                lines.append("Cursor \(remaining(included))")
+            }
+            if let auto = provider.bars.first(where: { $0.id == "auto" }) {
+                lines.append("Cursor Auto \(remaining(auto))")
+            }
+            return lines
+        case "openai":
+            return provider.bars.map { bar in
+                bar.label == "Week" && provider.bars.count == 1
+                    ? "Codex \(remaining(bar))"
+                    : "Codex \(short(bar)) \(remaining(bar))"
+            }
+        case "claude":
+            let order = ["session", "five", "weekly_all", "week"]
+            return order.compactMap { id in
+                guard let bar = provider.bars.first(where: { $0.id == id }) else { return nil }
+                let tag = (id == "session" || id == "five") ? "5h" : "wk"
+                return "Claude \(tag) \(remaining(bar))"
+            }
+        case "opencode":
+            guard let week = provider.chips.first(where: { $0.id == "week" }) else { return [] }
+            return ["OpenCode \(week.value)"]
+        default:
+            guard let bar = provider.bars.first else { return [] }
+            return ["\(provider.name) \(remaining(bar))"]
         }
-        let left = max(0, 100 - hero.usedPercent)
-        return "\(hero.name) \(Format.percent(left))"
+    }
+
+    private static func short(_ bar: MeterBar) -> String {
+        switch bar.label {
+        case "Week": return "wk"
+        case "5 hours": return "5h"
+        case "Day": return "day"
+        default: return bar.label
+        }
+    }
+
+    private static func remaining(_ bar: MeterBar) -> String {
+        if bar.usedPercent >= 99.5 { return "0%" }
+        return Format.percent(max(0, 100 - bar.usedPercent))
     }
 }
