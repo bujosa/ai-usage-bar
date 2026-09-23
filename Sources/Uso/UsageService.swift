@@ -389,6 +389,59 @@ struct UsageService: Sendable {
 
     // MARK: Claude
 
+    private enum ClaudeSessionCache {
+        private final class Store: @unchecked Sendable {
+            let lock = NSLock()
+            var memory: [String: Any]?
+        }
+
+        private static let store = Store()
+
+        private static var fileURL: URL {
+            Paths.file("Library", "Application Support", "Uso", "claude-session.json")
+        }
+
+        static func fresh() -> [String: Any]? {
+            store.lock.lock()
+            defer { store.lock.unlock() }
+            if let memory = store.memory, tokenIsFresh(memory) { return memory }
+            guard let data = try? Data(contentsOf: fileURL),
+                  let root = JSON.object(from: data),
+                  let oauth = JSON.dictionary(JSON.value(root, key: "claudeAiOauth")),
+                  tokenIsFresh(oauth)
+            else { return nil }
+            store.memory = oauth
+            return oauth
+        }
+
+        static func save(_ oauth: [String: Any]) {
+            store.lock.lock()
+            store.memory = oauth
+            store.lock.unlock()
+            let url = fileURL
+            let directory = url.deletingLastPathComponent()
+            try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path)
+            guard let data = try? JSONSerialization.data(withJSONObject: ["claudeAiOauth": oauth]) else { return }
+            try? data.write(to: url, options: .atomic)
+            try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+        }
+
+        static func clear() {
+            store.lock.lock()
+            store.memory = nil
+            store.lock.unlock()
+            try? FileManager.default.removeItem(at: fileURL)
+        }
+
+        private static func tokenIsFresh(_ oauth: [String: Any]) -> Bool {
+            let token = JSON.string(JSON.value(oauth, key: "accessToken")) ?? ""
+            guard !token.isEmpty else { return false }
+            let expires = Clock.unix(Double(JSON.int64(JSON.value(oauth, key: "expiresAt")) ?? 0))
+            return expires.timeIntervalSinceNow > 120
+        }
+    }
+
     func claudeWithPrompt() async -> ProviderSnapshot {
         await claude(prompt: true)
     }
@@ -406,8 +459,8 @@ struct UsageService: Sendable {
             return .problem(id: "claude", name: "Claude", tone: .missing, note: note)
         }
         let expires = Clock.unix(Double(JSON.int64(JSON.value(oauth, key: "expiresAt")) ?? 0))
-        if expires.timeIntervalSinceNow < 120 {
-            if let refreshed = await refreshClaude(oauth) {
+        if expires.timeIntervalSinceNow < 120, oauthRead.fromKeychain {
+            if let refreshed = await refreshClaude(oauth, prompt: prompt) {
                 oauth = refreshed
             }
         }
@@ -416,9 +469,20 @@ struct UsageService: Sendable {
         }
 
         var response = await claudeUsage(token: token)
-        if response?.0 == 401, let refreshed = await refreshClaude(oauth),
-           let next = JSON.string(JSON.value(refreshed, key: "accessToken")) {
-            response = await claudeUsage(token: next)
+        if response?.0 == 401 {
+            if let newer = rereadClaudeOAuth() {
+                oauth = newer
+                if let next = JSON.string(JSON.value(newer, key: "accessToken")) {
+                    response = await claudeUsage(token: next)
+                }
+            } else if oauthRead.fromKeychain, let refreshed = await refreshClaude(oauth, prompt: prompt),
+                      let next = JSON.string(JSON.value(refreshed, key: "accessToken")) {
+                oauth = refreshed
+                response = await claudeUsage(token: next)
+            } else if !prompt {
+                ClaudeSessionCache.clear()
+                return .problem(id: "claude", name: "Claude", tone: .missing, note: "Keychain locked")
+            }
         }
         guard let response else {
             return .problem(id: "claude", name: "Claude", tone: .failed, note: "Can't reach Claude.")
@@ -504,18 +568,33 @@ struct UsageService: Sendable {
         )
     }
 
-    private func readClaudeOAuth(prompt: Bool) -> (oauth: [String: Any]?, needsPermission: Bool) {
+    private func readClaudeOAuth(prompt: Bool) -> (oauth: [String: Any]?, needsPermission: Bool, fromKeychain: Bool) {
+        if !prompt, let cached = ClaudeSessionCache.fresh() {
+            return (cached, false, false)
+        }
         switch Keychain.password(service: "Claude Code-credentials", prompt: prompt) {
         case .data(let data):
             guard let root = JSON.object(from: data),
                   let oauth = JSON.dictionary(JSON.value(root, key: "claudeAiOauth"))
-            else { return (nil, false) }
-            return (oauth, false)
+            else { return (nil, false, false) }
+            ClaudeSessionCache.save(oauth)
+            return (oauth, false, true)
         case .needsPermission:
-            return (nil, true)
+            return (nil, true, false)
         case .missing:
-            return (nil, false)
+            return (nil, false, false)
         }
+    }
+
+    private func rereadClaudeOAuth() -> [String: Any]? {
+        guard case .data(let data) = Keychain.password(service: "Claude Code-credentials", prompt: false),
+              let root = JSON.object(from: data),
+              let oauth = JSON.dictionary(JSON.value(root, key: "claudeAiOauth")),
+              let token = JSON.string(JSON.value(oauth, key: "accessToken")),
+              !token.isEmpty
+        else { return nil }
+        ClaudeSessionCache.save(oauth)
+        return oauth
     }
 
     private func claudeUsage(token: String) async -> (Int, Data)? {
@@ -531,7 +610,7 @@ struct UsageService: Sendable {
         )
     }
 
-    private func refreshClaude(_ oauth: [String: Any]) async -> [String: Any]? {
+    private func refreshClaude(_ oauth: [String: Any], prompt: Bool) async -> [String: Any]? {
         guard let refresh = JSON.string(JSON.value(oauth, key: "refreshToken")),
               let url = URL(string: "https://platform.claude.com/v1/oauth/token"),
               let body = try? JSONSerialization.data(withJSONObject: [
@@ -563,9 +642,12 @@ struct UsageService: Sendable {
             preserved["claudeAiOauth"] = updated
             root = preserved
         }
-        if let encoded = try? JSONSerialization.data(withJSONObject: root),
-           Keychain.update(service: "Claude Code-credentials", account: NSUserName(), data: encoded) == false {
-            return updated
+        ClaudeSessionCache.save(updated)
+        if let encoded = try? JSONSerialization.data(withJSONObject: root) {
+            if Keychain.update(service: "Claude Code-credentials", account: NSUserName(), data: encoded, prompt: false) == false,
+               prompt {
+                _ = Keychain.update(service: "Claude Code-credentials", account: NSUserName(), data: encoded, prompt: true)
+            }
         }
         return updated
     }

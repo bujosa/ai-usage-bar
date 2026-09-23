@@ -268,7 +268,15 @@ enum Keychain {
         return .missing
     }
 
-    static func update(service: String, account: String, data: Data) -> Bool {
+    static func update(service: String, account: String, data: Data, prompt: Bool) -> Bool {
+        if !prompt {
+            SecKeychainSetUserInteractionAllowed(false)
+        }
+        defer {
+            if !prompt {
+                SecKeychainSetUserInteractionAllowed(true)
+            }
+        }
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
