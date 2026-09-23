@@ -238,14 +238,7 @@ enum KeychainRead {
 
 enum Keychain {
     static func password(service: String, prompt: Bool) -> KeychainRead {
-        if !prompt {
-            SecKeychainSetUserInteractionAllowed(false)
-        }
-        defer {
-            if !prompt {
-                SecKeychainSetUserInteractionAllowed(true)
-            }
-        }
+        SecKeychainSetUserInteractionAllowed(prompt)
         var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -266,32 +259,6 @@ enum Keychain {
             return .needsPermission
         }
         return .missing
-    }
-
-    static func update(service: String, account: String, data: Data, prompt: Bool) -> Bool {
-        if !prompt {
-            SecKeychainSetUserInteractionAllowed(false)
-        }
-        defer {
-            if !prompt {
-                SecKeychainSetUserInteractionAllowed(true)
-            }
-        }
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-        ]
-        let attributes: [String: Any] = [
-            kSecValueData as String: data,
-        ]
-        let status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
-        if status == errSecSuccess { return true }
-        let serviceOnly: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-        ]
-        return SecItemUpdate(serviceOnly as CFDictionary, attributes as CFDictionary) == errSecSuccess
     }
 }
 
