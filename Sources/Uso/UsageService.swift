@@ -434,11 +434,46 @@ struct UsageService: Sendable {
             try? FileManager.default.removeItem(at: fileURL)
         }
 
-        private static func tokenIsFresh(_ oauth: [String: Any]) -> Bool {
-            let token = JSON.string(JSON.value(oauth, key: "accessToken")) ?? ""
-            guard !token.isEmpty else { return false }
+        static func stored() -> [String: Any]? {
+            store.lock.lock()
+            defer { store.lock.unlock() }
+            if let memory = store.memory, hasToken(memory) { return memory }
+            guard let data = try? Data(contentsOf: fileURL),
+                  let root = JSON.object(from: data),
+                  let oauth = JSON.dictionary(JSON.value(root, key: "claudeAiOauth")),
+                  hasToken(oauth)
+            else { return nil }
+            store.memory = oauth
+            return oauth
+        }
+
+        static func isFresh(_ oauth: [String: Any]) -> Bool {
+            guard hasToken(oauth) else { return false }
             let expires = Clock.unix(Double(JSON.int64(JSON.value(oauth, key: "expiresAt")) ?? 0))
             return expires.timeIntervalSinceNow > 120
+        }
+
+        static func backoffActive() -> Bool {
+            Date().timeIntervalSince1970 < UserDefaults.standard.double(forKey: backoffKey)
+        }
+
+        static func noteDenied() {
+            UserDefaults.standard.set(Date().addingTimeInterval(6 * 60 * 60).timeIntervalSince1970, forKey: backoffKey)
+        }
+
+        static func clearBackoff() {
+            UserDefaults.standard.removeObject(forKey: backoffKey)
+        }
+
+        private static let backoffKey = "claudeKeychainBackoffUntil"
+
+        private static func hasToken(_ oauth: [String: Any]) -> Bool {
+            let token = JSON.string(JSON.value(oauth, key: "accessToken")) ?? ""
+            return !token.isEmpty
+        }
+
+        private static func tokenIsFresh(_ oauth: [String: Any]) -> Bool {
+            isFresh(oauth)
         }
     }
 
@@ -455,33 +490,20 @@ struct UsageService: Sendable {
         guard var oauth = oauthRead.oauth else {
             let note = oauthRead.needsPermission
                 ? "Keychain locked"
-                : "No Claude Code session in the keychain."
+                : "No Claude Code session. Sign in with the Claude Code CLI."
             return .problem(id: "claude", name: "Claude", tone: .missing, note: note)
         }
-        let expires = Clock.unix(Double(JSON.int64(JSON.value(oauth, key: "expiresAt")) ?? 0))
-        if expires.timeIntervalSinceNow < 120, oauthRead.fromKeychain {
-            if let refreshed = await refreshClaude(oauth, prompt: prompt) {
-                oauth = refreshed
-            }
-        }
         guard let token = JSON.string(JSON.value(oauth, key: "accessToken")), !token.isEmpty else {
-            return .problem(id: "claude", name: "Claude", tone: .missing, note: "Claude Code has no token. Open it again.")
+            return .problem(id: "claude", name: "Claude", tone: .missing, note: "Claude Code has no token. Sign in with the CLI.")
         }
 
         var response = await claudeUsage(token: token)
         if response?.0 == 401 {
-            if let newer = rereadClaudeOAuth() {
+            ClaudeSessionCache.clear()
+            if let newer = reloadClaudeOAuth(prompt: prompt),
+               let next = JSON.string(JSON.value(newer, key: "accessToken")) {
                 oauth = newer
-                if let next = JSON.string(JSON.value(newer, key: "accessToken")) {
-                    response = await claudeUsage(token: next)
-                }
-            } else if oauthRead.fromKeychain, let refreshed = await refreshClaude(oauth, prompt: prompt),
-                      let next = JSON.string(JSON.value(refreshed, key: "accessToken")) {
-                oauth = refreshed
                 response = await claudeUsage(token: next)
-            } else if !prompt {
-                ClaudeSessionCache.clear()
-                return .problem(id: "claude", name: "Claude", tone: .missing, note: "Keychain locked")
             }
         }
         guard let response else {
@@ -490,7 +512,7 @@ struct UsageService: Sendable {
         guard response.0 == 200, let body = JSON.object(from: response.1) else {
             let tone: ProviderTone = (response.0 == 401 || response.0 == 403) ? .missing : .failed
             let note = tone == .missing
-                ? "Claude session expired. Open Claude Code and sign in again."
+                ? "Claude session expired. Sign in with the Claude Code CLI."
                 : HTTP.message(status: response.0, data: response.1)
             return .problem(id: "claude", name: "Claude", tone: tone, note: note)
         }
@@ -572,28 +594,57 @@ struct UsageService: Sendable {
         if !prompt, let cached = ClaudeSessionCache.fresh() {
             return (cached, false, false)
         }
+        if let file = claudeCredentialsFile(), ClaudeSessionCache.isFresh(file) {
+            ClaudeSessionCache.save(file)
+            ClaudeSessionCache.clearBackoff()
+            return (file, false, false)
+        }
+        if !prompt, ClaudeSessionCache.backoffActive() {
+            if let cached = ClaudeSessionCache.stored() {
+                return (cached, false, false)
+            }
+            return (nil, true, false)
+        }
+        return takeClaudeKeychain(prompt: prompt)
+    }
+
+    private func reloadClaudeOAuth(prompt: Bool) -> [String: Any]? {
+        if let file = claudeCredentialsFile(),
+           let token = JSON.string(JSON.value(file, key: "accessToken")), !token.isEmpty {
+            ClaudeSessionCache.save(file)
+            return file
+        }
+        if !prompt, ClaudeSessionCache.backoffActive() { return nil }
+        return takeClaudeKeychain(prompt: prompt).oauth
+    }
+
+    private func takeClaudeKeychain(prompt: Bool) -> (oauth: [String: Any]?, needsPermission: Bool, fromKeychain: Bool) {
         switch Keychain.password(service: "Claude Code-credentials", prompt: prompt) {
         case .data(let data):
             guard let root = JSON.object(from: data),
                   let oauth = JSON.dictionary(JSON.value(root, key: "claudeAiOauth"))
             else { return (nil, false, false) }
             ClaudeSessionCache.save(oauth)
+            ClaudeSessionCache.clearBackoff()
             return (oauth, false, true)
         case .needsPermission:
+            if !prompt { ClaudeSessionCache.noteDenied() }
+            if let cached = ClaudeSessionCache.stored() {
+                return (cached, false, false)
+            }
             return (nil, true, false)
         case .missing:
             return (nil, false, false)
         }
     }
 
-    private func rereadClaudeOAuth() -> [String: Any]? {
-        guard case .data(let data) = Keychain.password(service: "Claude Code-credentials", prompt: false),
+    private func claudeCredentialsFile() -> [String: Any]? {
+        let url = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".claude/.credentials.json")
+        guard let data = try? Data(contentsOf: url),
               let root = JSON.object(from: data),
-              let oauth = JSON.dictionary(JSON.value(root, key: "claudeAiOauth")),
-              let token = JSON.string(JSON.value(oauth, key: "accessToken")),
-              !token.isEmpty
+              let oauth = JSON.dictionary(JSON.value(root, key: "claudeAiOauth"))
         else { return nil }
-        ClaudeSessionCache.save(oauth)
         return oauth
     }
 
@@ -608,48 +659,6 @@ struct UsageService: Sendable {
                 "anthropic-beta": "oauth-2025-04-20",
             ]
         )
-    }
-
-    private func refreshClaude(_ oauth: [String: Any], prompt: Bool) async -> [String: Any]? {
-        guard let refresh = JSON.string(JSON.value(oauth, key: "refreshToken")),
-              let url = URL(string: "https://platform.claude.com/v1/oauth/token"),
-              let body = try? JSONSerialization.data(withJSONObject: [
-                "grant_type": "refresh_token",
-                "refresh_token": refresh,
-                "client_id": "9d1c250a-e61b-44d9-88ed-5944d1962f5e",
-              ])
-        else { return nil }
-        guard let (status, data) = await HTTP.send(
-            url,
-            method: "POST",
-            headers: ["Content-Type": "application/json", "Accept": "application/json"],
-            body: body
-        ), status == 200, let payload = JSON.object(from: data) else { return nil }
-        let access = JSON.string(JSON.value(payload, key: "access_token"))
-            ?? JSON.string(JSON.value(payload, key: "accessToken"))
-        guard let access else { return nil }
-        var updated = oauth
-        updated["accessToken"] = access
-        if let next = JSON.string(JSON.value(payload, key: "refresh_token"))
-            ?? JSON.string(JSON.value(payload, key: "refreshToken")) {
-            updated["refreshToken"] = next
-        }
-        let expiresIn = JSON.double(JSON.value(payload, key: "expires_in")) ?? 1800
-        updated["expiresAt"] = Int(Date().timeIntervalSince1970 * 1000 + expiresIn * 1000)
-        var root: [String: Any] = ["claudeAiOauth": updated]
-        if case .data(let existing) = Keychain.password(service: "Claude Code-credentials", prompt: false),
-           var preserved = JSON.object(from: existing) {
-            preserved["claudeAiOauth"] = updated
-            root = preserved
-        }
-        ClaudeSessionCache.save(updated)
-        if let encoded = try? JSONSerialization.data(withJSONObject: root) {
-            if Keychain.update(service: "Claude Code-credentials", account: NSUserName(), data: encoded, prompt: false) == false,
-               prompt {
-                _ = Keychain.update(service: "Claude Code-credentials", account: NSUserName(), data: encoded, prompt: true)
-            }
-        }
-        return updated
     }
 
     // MARK: OpenCode
