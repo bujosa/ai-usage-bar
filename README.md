@@ -1,16 +1,22 @@
-# AI Usage Bar
+<p align="center">
+  <img src="docs/icon.png" alt="Uso" width="128">
+</p>
+
+# Uso
 
 Menu bar app for macOS. It shows what is left on Grok, Cursor, Codex, Claude, and OpenCode.
 
 The menu bar cycles through the accounts, about 3 seconds each. Claude shows the 5-hour window, then the week. Cursor shows included dollars, then Auto. Click the item to open the panel. Click anywhere else, or press Escape, to hide it. Open a row for the full breakdown.
 
-![Usage menu bar panel](docs/panel.png)
+<p align="center">
+  <img src="docs/panel.png" alt="Usage menu bar panel" width="328">
+</p>
 
 Requires macOS 14 or later on Apple silicon.
 
 ## Install
 
-Download the latest zip from the [releases page](https://github.com/bujosa/ai-usage-bar/releases/latest).
+Download the latest zip from the [releases page](https://github.com/bujosa/uso/releases/latest).
 
 1. Unzip the file. You get `Uso.app`.
 2. Move `Uso.app` into Applications.
