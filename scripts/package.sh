@@ -1,0 +1,53 @@
+#!/bin/zsh
+set -euo pipefail
+root="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$root"
+version="1.0.0"
+swift build -c release
+
+stage="$(mktemp -d)"
+app="$stage/Uso.app"
+mkdir -p "$app/Contents/MacOS"
+cp "$root/.build/release/Uso" "$app/Contents/MacOS/Uso"
+cat > "$app/Contents/Info.plist" << EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleExecutable</key>
+  <string>Uso</string>
+  <key>CFBundleIdentifier</key>
+  <string>com.davidbujosa.uso</string>
+  <key>CFBundleName</key>
+  <string>Uso</string>
+  <key>CFBundleDisplayName</key>
+  <string>Uso</string>
+  <key>CFBundlePackageType</key>
+  <string>APPL</string>
+  <key>CFBundleShortVersionString</key>
+  <string>${version}</string>
+  <key>CFBundleVersion</key>
+  <string>1</string>
+  <key>LSMinimumSystemVersion</key>
+  <string>14.0</string>
+  <key>CFBundleDevelopmentRegion</key>
+  <string>en</string>
+  <key>LSUIElement</key>
+  <true/>
+  <key>NSHighResolutionCapable</key>
+  <true/>
+  <key>LSArchitecturePriority</key>
+  <array>
+    <string>arm64</string>
+  </array>
+</dict>
+</plist>
+EOF
+codesign --force --sign - "$app"
+mkdir -p "$root/dist"
+rm -rf "$root/dist/Uso.app"
+ditto "$app" "$root/dist/Uso.app"
+rm -f "$root/dist/Uso-${version}-macOS.zip"
+ditto -c -k --keepParent "$root/dist/Uso.app" "$root/dist/Uso-${version}-macOS.zip"
+rm -rf "$stage"
+echo "$root/dist/Uso-${version}-macOS.zip"
