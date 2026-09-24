@@ -221,6 +221,9 @@ struct UsageService: Sendable {
             ?? 0
         let remaining = JSON.double(JSON.value(planUsage, key: "remaining"))
         var bars: [MeterBar] = []
+        if let auto = JSON.double(JSON.value(planUsage, key: "autoPercentUsed")) {
+            bars.append(MeterBar(id: "auto", label: "Auto", usedPercent: auto, detail: "Other models"))
+        }
         if limit > 0 {
             let used = min(100, spent / limit * 100)
             let detail: String
@@ -230,9 +233,6 @@ struct UsageService: Sendable {
                 detail = "\(Format.money(cents: spent)) of \(Format.money(cents: limit))"
             }
             bars.append(MeterBar(id: "included", label: "Included", usedPercent: used, detail: detail))
-        }
-        if let auto = JSON.double(JSON.value(planUsage, key: "autoPercentUsed")) {
-            bars.append(MeterBar(id: "auto", label: "Auto", usedPercent: auto, detail: "Other models"))
         }
         if let api = JSON.double(JSON.value(planUsage, key: "apiPercentUsed")) {
             bars.append(MeterBar(id: "api", label: "API", usedPercent: api, detail: ""))
@@ -279,7 +279,9 @@ struct UsageService: Sendable {
         }
 
         let headline: String
-        if let remaining {
+        if let auto = bars.first(where: { $0.id == "auto" }) {
+            headline = "\(Format.percent(max(0, 100 - auto.usedPercent))) left"
+        } else if let remaining {
             headline = "\(Format.money(cents: remaining)) left"
         } else if let first = bars.first {
             headline = "\(Format.percent(max(0, 100 - first.usedPercent))) left"

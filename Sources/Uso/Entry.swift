@@ -102,7 +102,7 @@ final class UsoDelegate: NSObject, NSApplicationDelegate {
         panel = window
         resize(window)
         if centered {
-            window.center()
+            center(window)
         } else {
             placeUnderStatusItem(window)
         }
@@ -112,7 +112,11 @@ final class UsoDelegate: NSObject, NSApplicationDelegate {
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self, weak window] in
                 guard let self, let window else { return }
                 self.resize(window)
-                if !self.centered { self.placeUnderStatusItem(window) }
+                if self.centered {
+                    self.center(window)
+                } else {
+                    self.placeUnderStatusItem(window)
+                }
             }
         }
     }
@@ -133,7 +137,7 @@ final class UsoDelegate: NSObject, NSApplicationDelegate {
         window.backgroundColor = .clear
         window.hasShadow = true
         window.level = .statusBar
-        window.hidesOnDeactivate = true
+        window.hidesOnDeactivate = !centered
         window.collectionBehavior = [.transient, .ignoresCycle]
         window.isMovableByWindowBackground = true
         window.contentView = content
@@ -157,6 +161,18 @@ final class UsoDelegate: NSObject, NSApplicationDelegate {
         let intrinsic = content.intrinsicContentSize.height
         let height = intrinsic > 1 ? intrinsic : content.fittingSize.height
         window.setContentSize(NSSize(width: 328, height: max(height, 200)))
+    }
+
+    private func center(_ window: NSWindow) {
+        guard let visible = NSScreen.main?.visibleFrame else {
+            window.center()
+            return
+        }
+        let size = window.frame.size
+        window.setFrameOrigin(NSPoint(
+            x: visible.midX - size.width / 2,
+            y: visible.midY - size.height / 2
+        ))
     }
 
     private func placeUnderStatusItem(_ window: NSWindow) {

@@ -31,7 +31,7 @@ struct PanelView: View {
                 footer
             }
         }
-        .frame(width: 328)
+        .frame(width: Glass.width)
         .animation(.smooth(duration: 0.22), value: selectedID)
         .background {
             Button(action: hide) { Color.clear }
@@ -41,11 +41,23 @@ struct PanelView: View {
                 .allowsHitTesting(false)
                 .accessibilityHidden(true)
         }
-        .background(GlassBackground())
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background {
+            ZStack {
+                GlassBackground()
+                Color.black.opacity(0.42)
+                LinearGradient(
+                    colors: [Color.white.opacity(0.14), Color.white.opacity(0)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 88)
+                .frame(maxHeight: .infinity, alignment: .top)
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: Glass.radius, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+            RoundedRectangle(cornerRadius: Glass.radius, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.16), lineWidth: 0.5)
         )
         .task {
             for window in NSApp.windows where window.identifier?.rawValue != "uso-panel" {
@@ -84,9 +96,11 @@ struct PanelView: View {
                 }
                 .buttonStyle(RowButtonStyle())
                 if index < store.providers.count - 1 {
-                    Divider()
-                        .padding(.leading, 16)
-                        .opacity(0.55)
+                    Rectangle()
+                        .fill(Color.white.opacity(0.08))
+                        .frame(height: 0.5)
+                        .padding(.leading, 28)
+                        .padding(.trailing, Glass.inset)
                 }
             }
         }
@@ -132,6 +146,7 @@ struct PanelView: View {
                     }
                 }
                 .frame(width: 22, height: 22)
+                .background(Circle().fill(Color.white.opacity(0.08)))
                 .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
@@ -146,7 +161,9 @@ struct PanelView: View {
 
     private var footer: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Divider().opacity(0.45)
+            Rectangle()
+                .fill(Color.white.opacity(0.08))
+                .frame(height: 0.5)
             HStack {
                 if store.showsLoginToggle {
                     Toggle("Open at login", isOn: Binding(
@@ -197,7 +214,7 @@ struct PanelView: View {
             content.invalidateIntrinsicContentSize()
             let intrinsic = content.intrinsicContentSize.height
             let height = intrinsic > 1 ? intrinsic : content.fittingSize.height
-            window.setContentSize(NSSize(width: 328, height: max(height, 180)))
+            window.setContentSize(NSSize(width: Glass.width, height: max(height, 180)))
         }
     }
 }
@@ -256,16 +273,23 @@ private struct ProviderRow: View {
     private var amount: String {
         if provider.tone == .loading { return "…" }
         if provider.tone != .ready { return "—" }
-        if provider.headline.contains("$") {
+        if provider.id != "cursor", provider.headline.contains("$") {
             return provider.headline.replacingOccurrences(of: " left", with: "")
         }
-        if let used = provider.bars.first?.usedPercent {
+        if let used = primaryBar?.usedPercent {
             return Format.percent(max(0, 100 - used))
         }
         if let week = provider.chips.first(where: { $0.id == "week" }) {
             return week.value
         }
         return provider.headline
+    }
+
+    private var primaryBar: MeterBar? {
+        if provider.id == "cursor" {
+            return provider.bars.first { $0.id == "auto" } ?? provider.bars.first
+        }
+        return provider.bars.first
     }
 
     private var showsBarLabels: Bool {
@@ -275,7 +299,8 @@ private struct ProviderRow: View {
     private var listBars: [MeterBar] {
         switch provider.id {
         case "cursor":
-            return provider.bars.filter { $0.id == "included" || $0.id == "auto" }
+            let order = ["auto", "included"]
+            return order.compactMap { id in provider.bars.first { $0.id == id } }
         case "claude":
             let order = ["session", "five", "weekly_all", "week"]
             return provider.bars
@@ -299,7 +324,7 @@ private struct ProviderRow: View {
     }
 
     private var amountColor: Color {
-        guard let used = provider.bars.first?.usedPercent else { return .primary }
+        guard let used = primaryBar?.usedPercent else { return .primary }
         if used >= 90 { return .red }
         if used >= 75 { return .orange }
         return .primary
@@ -464,13 +489,13 @@ private struct Meter: View {
         GeometryReader { geo in
             ZStack(alignment: .leading) {
                 Capsule()
-                    .fill(Color.primary.opacity(0.08))
+                    .fill(Color.white.opacity(0.10))
                 Capsule()
                     .fill(fill)
-                    .frame(width: max(clamped > 0 ? 3 : 0, geo.size.width * clamped / 100))
+                    .frame(width: max(clamped > 0 ? 4 : 0, geo.size.width * clamped / 100))
             }
         }
-        .frame(height: 4)
+        .frame(height: 6)
     }
 
     private var fill: Color {
@@ -493,6 +518,12 @@ private struct RowButtonStyle: ButtonStyle {
             )
             .onHover { hovered = $0 }
     }
+}
+
+private enum Glass {
+    static let width: CGFloat = 328
+    static let radius: CGFloat = 22
+    static let inset: CGFloat = 14
 }
 
 private struct GlassBackground: NSViewRepresentable {

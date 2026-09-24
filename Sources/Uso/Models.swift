@@ -146,13 +146,14 @@ enum MenuTicker {
             return ["Grok \(remaining(bar))"]
         case "cursor":
             var lines: [String] = []
+            if let auto = provider.bars.first(where: { $0.id == "auto" }) {
+                lines.append("Cursor Auto \(remaining(auto))")
+            }
             if provider.headline.contains("$") {
                 lines.append("Cursor \(provider.headline.replacingOccurrences(of: " left", with: ""))")
             } else if let included = provider.bars.first(where: { $0.id == "included" }) {
-                lines.append("Cursor \(remaining(included))")
-            }
-            if let auto = provider.bars.first(where: { $0.id == "auto" }) {
-                lines.append("Cursor Auto \(remaining(auto))")
+                let money = included.detail
+                lines.append(money.contains("$") ? "Cursor \(money)" : "Cursor \(remaining(included))")
             }
             return lines
         case "openai":
