@@ -6,7 +6,7 @@
 
 Menu bar app for macOS. It shows what is left on Grok, Cursor, Codex, Claude, and OpenCode.
 
-The menu bar cycles through the accounts, about 3 seconds each. Claude shows the 5-hour window, then the week. Cursor shows included dollars, then Auto. Click the item to open the panel. Click anywhere else, or press Escape, to hide it. Open a row for the full breakdown.
+The menu bar cycles through the accounts, about 3 seconds each. Claude shows the 5-hour window, then the week. Cursor shows Auto, then included dollars. Click the item to open the panel. Click anywhere else, or press Escape, to hide it. Open a row for the full breakdown.
 
 <p align="center">
   <img src="docs/panel.png" alt="Usage menu bar panel" width="328">
@@ -38,7 +38,7 @@ That builds a release binary, installs `~/Applications/Uso.app`, and opens it. `
 ## What each row shows
 
 - **Grok.** Weekly credits, plus Build, Imagine, Chat, and Voice when the account returns them.
-- **Cursor.** Included dollars and Auto on the row. API usage and the token mix are inside the row. Auto is the pool for the other models.
+- **Cursor.** Auto, then included dollars, on the row. API usage and the token mix are inside the row. Auto is the pool for the other models.
 - **Codex.** The weekly window is on the row. A shorter window, when the account has one, sits above it.
 - **Claude.** Session and week are both on the row. A model week such as Fable, and the mix across Claude Code and the rest, are inside the row.
 - **OpenCode.** Local tokens for today, the last 7 days, and all time. This is sessions on this Mac, not a plan quota. An OpenCode Go key adds the official quota.

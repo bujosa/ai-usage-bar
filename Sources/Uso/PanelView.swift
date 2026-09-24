@@ -273,16 +273,23 @@ private struct ProviderRow: View {
     private var amount: String {
         if provider.tone == .loading { return "…" }
         if provider.tone != .ready { return "—" }
-        if provider.headline.contains("$") {
+        if provider.id != "cursor", provider.headline.contains("$") {
             return provider.headline.replacingOccurrences(of: " left", with: "")
         }
-        if let used = provider.bars.first?.usedPercent {
+        if let used = primaryBar?.usedPercent {
             return Format.percent(max(0, 100 - used))
         }
         if let week = provider.chips.first(where: { $0.id == "week" }) {
             return week.value
         }
         return provider.headline
+    }
+
+    private var primaryBar: MeterBar? {
+        if provider.id == "cursor" {
+            return provider.bars.first { $0.id == "auto" } ?? provider.bars.first
+        }
+        return provider.bars.first
     }
 
     private var showsBarLabels: Bool {
@@ -292,7 +299,8 @@ private struct ProviderRow: View {
     private var listBars: [MeterBar] {
         switch provider.id {
         case "cursor":
-            return provider.bars.filter { $0.id == "included" || $0.id == "auto" }
+            let order = ["auto", "included"]
+            return order.compactMap { id in provider.bars.first { $0.id == id } }
         case "claude":
             let order = ["session", "five", "weekly_all", "week"]
             return provider.bars
@@ -316,7 +324,7 @@ private struct ProviderRow: View {
     }
 
     private var amountColor: Color {
-        guard let used = provider.bars.first?.usedPercent else { return .primary }
+        guard let used = primaryBar?.usedPercent else { return .primary }
         if used >= 90 { return .red }
         if used >= 75 { return .orange }
         return .primary
