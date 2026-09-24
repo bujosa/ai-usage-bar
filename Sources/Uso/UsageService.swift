@@ -489,7 +489,7 @@ struct UsageService: Sendable {
         let oauthRead = readClaudeOAuth(prompt: prompt)
         guard var oauth = oauthRead.oauth else {
             let note = oauthRead.needsPermission
-                ? "Keychain locked"
+                ? "Claude Code is signed in. Tap and choose Always Allow."
                 : "No Claude Code session. Sign in with the Claude Code CLI."
             return .problem(id: "claude", name: "Claude", tone: .missing, note: note)
         }
@@ -510,11 +510,11 @@ struct UsageService: Sendable {
             return .problem(id: "claude", name: "Claude", tone: .failed, note: "Can't reach Claude.")
         }
         guard response.0 == 200, let body = JSON.object(from: response.1) else {
-            let tone: ProviderTone = (response.0 == 401 || response.0 == 403) ? .missing : .failed
-            let note = tone == .missing
-                ? "Claude session expired. Sign in with the Claude Code CLI."
+            let rejected = response.0 == 401 || response.0 == 403
+            let note = rejected
+                ? "Couldn't refresh Claude. The last reading stays up."
                 : HTTP.message(status: response.0, data: response.1)
-            return .problem(id: "claude", name: "Claude", tone: tone, note: note)
+            return .problem(id: "claude", name: "Claude", tone: .failed, note: note)
         }
 
         var bars: [MeterBar] = []
@@ -600,17 +600,13 @@ struct UsageService: Sendable {
             return (file, false, false)
         }
         if !prompt, ClaudeSessionCache.backoffActive() {
-            if let cached = ClaudeSessionCache.stored() {
-                return (cached, false, false)
-            }
             return (nil, true, false)
         }
         return takeClaudeKeychain(prompt: prompt)
     }
 
     private func reloadClaudeOAuth(prompt: Bool) -> [String: Any]? {
-        if let file = claudeCredentialsFile(),
-           let token = JSON.string(JSON.value(file, key: "accessToken")), !token.isEmpty {
+        if let file = claudeCredentialsFile(), ClaudeSessionCache.isFresh(file) {
             ClaudeSessionCache.save(file)
             return file
         }
@@ -619,23 +615,32 @@ struct UsageService: Sendable {
     }
 
     private func takeClaudeKeychain(prompt: Bool) -> (oauth: [String: Any]?, needsPermission: Bool, fromKeychain: Bool) {
+        if let oauth = oauth(from: Keychain.passwordViaSecurity(service: "Claude Code-credentials")) {
+            ClaudeSessionCache.save(oauth)
+            ClaudeSessionCache.clearBackoff()
+            return (oauth, false, true)
+        }
         switch Keychain.password(service: "Claude Code-credentials", prompt: prompt) {
         case .data(let data):
-            guard let root = JSON.object(from: data),
-                  let oauth = JSON.dictionary(JSON.value(root, key: "claudeAiOauth"))
-            else { return (nil, false, false) }
+            guard let oauth = oauth(from: .data(data)) else { return (nil, false, false) }
             ClaudeSessionCache.save(oauth)
             ClaudeSessionCache.clearBackoff()
             return (oauth, false, true)
         case .needsPermission:
             if !prompt { ClaudeSessionCache.noteDenied() }
-            if let cached = ClaudeSessionCache.stored() {
-                return (cached, false, false)
-            }
             return (nil, true, false)
         case .missing:
             return (nil, false, false)
         }
+    }
+
+    private func oauth(from read: KeychainRead) -> [String: Any]? {
+        guard case .data(let data) = read,
+              let root = JSON.object(from: data),
+              let oauth = JSON.dictionary(JSON.value(root, key: "claudeAiOauth")),
+              ClaudeSessionCache.isFresh(oauth)
+        else { return nil }
+        return oauth
     }
 
     private func claudeCredentialsFile() -> [String: Any]? {

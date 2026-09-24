@@ -2,7 +2,7 @@
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$root"
-version="1.0.6"
+version="1.0.7"
 swift build -c release
 
 stage="$(mktemp -d)"
@@ -46,7 +46,12 @@ cat > "$app/Contents/Info.plist" << EOF
 </dict>
 </plist>
 EOF
-codesign --force --sign - "$app"
+identity="Uso Local"
+if ! security find-identity -p codesigning | grep -q "$identity"; then
+  "$root/scripts/sign-identity.sh"
+fi
+hash="$(security find-identity -p codesigning | awk -v name="$identity" -F'"' '$2 == name { print $1 }' | awk '{ print $2; exit }')"
+codesign --force --sign "$hash" "$app"
 mkdir -p "$root/dist"
 rm -rf "$root/dist/Uso.app"
 ditto "$app" "$root/dist/Uso.app"
