@@ -33,7 +33,7 @@ Sign in with the Claude Code CLI. Uso reads that live session and does not log i
 ./scripts/install.sh
 ```
 
-That builds a release binary, installs `~/Applications/Uso.app`, and opens it. `./scripts/package.sh` only writes `dist/Uso-1.0.7-macOS.zip`.
+That builds a release binary, installs `~/Applications/Uso.app`, and opens it. `./scripts/package.sh` only writes `dist/Uso-1.0.8-macOS.zip`.
 
 ## What each row shows
 
