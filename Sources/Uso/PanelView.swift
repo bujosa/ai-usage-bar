@@ -74,7 +74,11 @@ struct PanelView: View {
         VStack(spacing: 0) {
             ForEach(Array(store.providers.enumerated()), id: \.element.id) { index, provider in
                 Button {
-                    selectedID = provider.id
+                    if provider.id == "claude", provider.note?.hasPrefix("Claude Code is signed in") == true {
+                        store.allowClaudeKeychain()
+                    } else {
+                        selectedID = provider.id
+                    }
                 } label: {
                     ProviderRow(provider: provider)
                 }
@@ -222,7 +226,7 @@ private struct ProviderRow: View {
                 Text(caption)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                    .lineLimit(2)
                     .padding(.leading, 14)
             }
             VStack(alignment: .leading, spacing: 6) {
@@ -303,6 +307,7 @@ private struct ProviderRow: View {
 
     private var caption: String {
         if provider.tone == .loading { return "Loading" }
+        if let warning = provider.warning, !warning.isEmpty { return warning }
         if provider.tone != .ready {
             return provider.note ?? "No data"
         }
@@ -352,7 +357,7 @@ private struct DetailView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-                if provider.id == "claude", note == "Keychain locked" {
+                if provider.id == "claude", note.hasPrefix("Claude Code is signed in") {
                     Button("Allow access") {
                         store.allowClaudeKeychain()
                     }

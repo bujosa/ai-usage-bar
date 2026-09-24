@@ -87,7 +87,7 @@ final class UsageStore: ObservableObject {
 
     private func apply(_ snapshot: ProviderSnapshot, keeping baseline: [ProviderSnapshot]) {
         var item = snapshot
-        if item.tone == .failed, let previous = baseline.first(where: { $0.id == item.id && $0.tone == .ready }) {
+        if item.tone != .ready, let previous = baseline.first(where: { $0.id == item.id && $0.tone == .ready }) {
             var kept = previous
             kept.warning = item.note ?? "Couldn't refresh."
             item = kept

@@ -260,6 +260,37 @@ enum Keychain {
         }
         return .missing
     }
+
+    /// Reads a generic password through `/usr/bin/security`, the same path CodexBar
+    /// and OpenClaw use. That binary is already allowed to read Claude Code's item,
+    /// so a background refresh does not open a password dialog.
+    static func passwordViaSecurity(service: String) -> KeychainRead {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/security")
+        process.arguments = ["find-generic-password", "-s", service, "-w"]
+        let output = Pipe()
+        let errors = Pipe()
+        process.standardOutput = output
+        process.standardError = errors
+        do {
+            try process.run()
+        } catch {
+            return .missing
+        }
+        let deadline = Date().addingTimeInterval(3)
+        while process.isRunning, Date() < deadline {
+            Thread.sleep(forTimeInterval: 0.05)
+        }
+        if process.isRunning {
+            process.terminate()
+            return .needsPermission
+        }
+        guard process.terminationStatus == 0 else { return .needsPermission }
+        var data = output.fileHandleForReading.readDataToEndOfFile()
+        if data.last == 0x0A { data.removeLast() }
+        guard !data.isEmpty else { return .missing }
+        return .data(data)
+    }
 }
 
 enum SQLite {

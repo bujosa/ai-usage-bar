@@ -25,7 +25,7 @@ Download the latest zip from the [releases page](https://github.com/bujosa/uso/r
 
 The app does not show a Dock icon. Quit it from the panel.
 
-Sign in with the Claude Code CLI. Uso reads that session and does not log in, refresh the token, or write the keychain. macOS may ask once for keychain access. After that, Uso keeps a private copy. If the dialog comes back, choose Always Allow, or open Claude in Uso and press Allow access.
+Sign in with the Claude Code CLI. Uso reads that live session and does not log in, refresh the token, or write the keychain. A failed refresh keeps the last percentages on the row.
 
 ## From source
 
@@ -33,7 +33,7 @@ Sign in with the Claude Code CLI. Uso reads that session and does not log in, re
 ./scripts/install.sh
 ```
 
-That builds a release binary, installs `~/Applications/Uso.app`, and opens it. `./scripts/package.sh` only writes `dist/Uso-1.0.6-macOS.zip`.
+That builds a release binary, installs `~/Applications/Uso.app`, and opens it. `./scripts/package.sh` only writes `dist/Uso-1.0.7-macOS.zip`.
 
 ## What each row shows
 
