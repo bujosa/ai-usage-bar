@@ -12,7 +12,7 @@ The menu bar cycles through the accounts, about 3 seconds each. Claude shows the
   <img src="docs/panel.png" alt="Usage menu bar panel" width="328">
 </p>
 
-Requires macOS 14 or later on Apple silicon.
+Requires macOS 14 or later on Apple silicon. While it sits in the menu bar it uses about 42 MB of memory.
 
 ## Install
 
